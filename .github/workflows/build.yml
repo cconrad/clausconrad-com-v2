@@ -1,0 +1,102 @@
+name: Build Combined Site
+
+on:
+  workflow_dispatch:
+  repository_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+      NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+
+      - name: Checkout obsidian-personal (private)
+        uses: actions/checkout@v4
+        with:
+          repository: cconrad/obsidian-personal
+          token: ${{ secrets.GH_PAT_READ_OBSIDIAN_PERSONAL }}
+          path: .sources/obsidian-personal
+
+      - name: Checkout cconrad.github.io
+        uses: actions/checkout@v4
+        with:
+          repository: cconrad/cconrad.github.io
+          path: .sources/cconrad.github.io
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Cache Quartz node_modules
+        uses: actions/cache@v4
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-quartz-node-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-quartz-node-
+
+      - name: Install Quartz dependencies
+        run: npm ci
+
+      - name: Install Python dependencies
+        run: uv sync
+
+      - name: Filter published notes
+        run: |
+          rm -rf content
+          mkdir content
+          uv run scripts/filter_notes.py .sources/obsidian-personal content/
+
+      - name: Build Quartz
+        run: npx quartz build
+
+      - name: Cache Eleventy node_modules
+        uses: actions/cache@v4
+        with:
+          path: .sources/cconrad.github.io/node_modules
+          key: ${{ runner.os }}-eleventy-node-${{ hashFiles('.sources/cconrad.github.io/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-eleventy-node-
+
+      - name: Install Eleventy dependencies
+        run: npm install --no-save
+        working-directory: .sources/cconrad.github.io
+
+      - name: Build Eleventy
+        run: npm run build
+        working-directory: .sources/cconrad.github.io
+
+      - name: Merge outputs into _combined/
+        run: |
+          mkdir -p _combined/notes
+          cp -r .sources/cconrad.github.io/_site/. _combined/
+          cp -r public/. _combined/notes/
+
+      - name: Upload _combined/ artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: combined-site
+          path: _combined/
+          if-no-files-found: error
+
+      - name: Deploy to Netlify
+        if: env.NETLIFY_AUTH_TOKEN != ''
+        uses: netlify/actions/cli@master
+        with:
+          args: deploy --prod --dir=_combined
+
