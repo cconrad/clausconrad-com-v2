@@ -1,11 +1,35 @@
 .DS_Store
-.gitignore
-node_modules
-public
-prof
+node_modules/
+public/
+prof/
 tsconfig.tsbuildinfo
 .obsidian
-.quartz-cache
+.quartz-cache/
 private/
 .replit
 replit.nix
+
+# Build artifacts
+.sources/
+_combined/
+__pycache__/
+
+# Content is generated at build time, but must not be excluded here, or Quartz will not render those files
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# Local Netlify folder
+.netlify
