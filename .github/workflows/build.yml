@@ -94,13 +94,6 @@ jobs:
           cp -r .sources/cconrad.github.io/_site/. _combined/
           cp -r public/. _combined/notes/
 
-      - name: Upload _combined/ artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: combined-site
-          path: _combined/
-          if-no-files-found: error
-
       - name: Deploy to Netlify
         if: env.NETLIFY_AUTH_TOKEN != ''
         uses: netlify/actions/cli@master
